@@ -1,0 +1,38 @@
+name: Assessment Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  assessment:
+    # Only the instructor's unfinished main is exempt. EVERY student fork is graded.
+    # Pull requests are graded even when they target the instructor's main.
+    if: >-
+      github.repository != 'kaw393939/is218_test1_official' ||
+      github.ref != 'refs/heads/main' ||
+      github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out submitted files
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Check required files, configuration, and Git hygiene
+        run: python scripts/check_project.py
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Run student tests and published acceptance checks
+        run: python -m pytest tests checks -v -o xfail_strict=true --junitxml="$RUNNER_TEMP/assessment-results.xml"
+      - name: Verify all six student tests and acceptance checks passed
+        if: ${{ !cancelled() }}
+        run: python scripts/check_results.py "$RUNNER_TEMP/assessment-results.xml"
